@@ -109,3 +109,33 @@ def test_oci_service_error_maps_to_502() -> None:
 
     assert response.status_code == 502
     assert response.json() == {"detail": "OCI Usage API error"}
+
+
+def test_widget_returns_no_content_for_non_target_server() -> None:
+    app.dependency_overrides[get_billing_service] = lambda: FakeBillingService()
+    app.dependency_overrides[validate_startup_settings] = lambda: None
+    app.state.settings_override = lambda: type(
+        "Settings",
+        (),
+        {"billing_api_key": "secret", "nezha_server_id": 1},
+    )()
+
+    response = TestClient(app).get("/widget/month?serverId=2")
+
+    assert response.status_code == 204
+    assert response.content == b""
+
+
+def test_widget_returns_month_cost_for_target_server() -> None:
+    app.dependency_overrides[get_billing_service] = lambda: FakeBillingService()
+    app.dependency_overrides[validate_startup_settings] = lambda: None
+    app.state.settings_override = lambda: type(
+        "Settings",
+        (),
+        {"billing_api_key": "secret", "nezha_server_id": 1},
+    )()
+
+    response = TestClient(app).get("/widget/month?serverId=1")
+
+    assert response.status_code == 200
+    assert response.json()["total"] == 1.23

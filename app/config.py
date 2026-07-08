@@ -14,6 +14,7 @@ class Settings(BaseSettings):
         alias="OCI_AUTH",
     )
     cache_ttl_seconds: int = Field(default=1800, alias="CACHE_TTL_SECONDS", ge=1)
+    nezha_server_id: int | None = Field(default=None, alias="NEZHA_SERVER_ID", ge=1)
     port: int = Field(default=8000, alias="PORT", ge=1, le=65535)
     log_level: str = Field(default="INFO", alias="LOG_LEVEL")
 

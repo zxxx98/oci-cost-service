@@ -13,6 +13,7 @@ with an `X-API-Key` header.
 - Current-month cost grouped by OCI service.
 - Current-month cost grouped by OCI resource.
 - Current-month daily cost trend.
+- Optional Nezha dashboard widget endpoint for one configured server.
 - In-memory TTL cache for Usage API responses.
 - Docker deployment with configurable public port.
 - No OCI user API key or private key file required in production.
@@ -32,6 +33,13 @@ curl -H "X-API-Key: $BILLING_API_KEY" http://SERVER_IP:8000/cost/month
 curl -H "X-API-Key: $BILLING_API_KEY" http://SERVER_IP:8000/cost/month/by-service
 curl -H "X-API-Key: $BILLING_API_KEY" http://SERVER_IP:8000/cost/month/by-resource
 curl -H "X-API-Key: $BILLING_API_KEY" http://SERVER_IP:8000/cost/month/daily
+```
+
+Nezha widget endpoint does not require `X-API-Key`; it only returns data when
+`serverId` matches `NEZHA_SERVER_ID`. Non-target servers receive `204 No Content`:
+
+```bash
+curl "http://SERVER_IP:8000/widget/month?serverId=1"
 ```
 
 Example response:
@@ -79,6 +87,7 @@ Edit `.env`:
 BILLING_API_KEY=replace-with-a-long-random-secret
 OCI_AUTH=instance_principal
 CACHE_TTL_SECONDS=1800
+NEZHA_SERVER_ID=
 HOST_PORT=8000
 PORT=8000
 LOG_LEVEL=INFO
@@ -92,6 +101,9 @@ openssl rand -hex 32
 
 `HOST_PORT` is the public host port. `PORT` is the internal Uvicorn port inside
 the container and should normally remain `8000`.
+
+Set `NEZHA_SERVER_ID` only when exposing the Nezha widget endpoint. Leave it
+empty to disable widget responses.
 
 ## Docker
 
@@ -126,6 +138,7 @@ docker run -d \
   -e BILLING_API_KEY="$API_KEY" \
   -e OCI_AUTH=instance_principal \
   -e CACHE_TTL_SECONDS=1800 \
+  -e NEZHA_SERVER_ID=1 \
   -e PORT=8000 \
   -p 20000:8000 \
   oci-cost-service:latest
@@ -149,6 +162,8 @@ python3 -m venv .venv
 
 - Do not commit `.env`.
 - Do not expose the service without `X-API-Key`.
+- Do not put `BILLING_API_KEY` in frontend custom code. Use `/widget/month`
+  only for limited dashboard display data.
 - Use HTTPS termination, such as Caddy, Nginx, or an OCI Load Balancer, for
   public production access.
 - Rotate `BILLING_API_KEY` if it is ever shared accidentally.

@@ -3,7 +3,8 @@ from contextlib import asynccontextmanager
 from functools import lru_cache
 from typing import Any, Callable
 
-from fastapi import Depends, FastAPI, HTTPException, status
+from fastapi import Depends, FastAPI, HTTPException, Query, Request, Response, status
+from fastapi.middleware.cors import CORSMiddleware
 from oci.exceptions import ServiceError
 
 from app.auth import require_api_key
@@ -30,6 +31,19 @@ async def lifespan(app: FastAPI):
 
 
 app = FastAPI(title="OCI Current Month Cost Service", lifespan=lifespan)
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_methods=["GET", "OPTIONS"],
+    allow_headers=["*"],
+)
+
+
+def _settings_for_request(request: Request):
+    override = getattr(request.app.state, "settings_override", None)
+    if override is not None:
+        return override()
+    return get_settings()
 
 
 @lru_cache
@@ -60,6 +74,18 @@ def _billing_response(operation: Callable[[], dict[str, Any]]) -> dict[str, Any]
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="Internal server error",
         )
+
+
+@app.get("/widget/month", response_model=None)
+def widget_month(
+    request: Request,
+    server_id: int = Query(alias="serverId"),
+    service: BillingService = Depends(get_billing_service),
+) -> Any:
+    settings = _settings_for_request(request)
+    if settings.nezha_server_id is None or settings.nezha_server_id != server_id:
+        return Response(status_code=status.HTTP_204_NO_CONTENT)
+    return _billing_response(service.month_total)
 
 
 @app.get("/cost/month", dependencies=[Depends(require_api_key)])
