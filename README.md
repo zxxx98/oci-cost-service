@@ -1,46 +1,154 @@
-# OCI Current Month Cost Service
+# OCI Cost Service
 
-Dockerized FastAPI service for querying the current UTC month's OCI cost.
+Dockerized FastAPI service for querying the current UTC month's Oracle Cloud
+Infrastructure cost through OCI Usage API.
 
-## Configuration
+The service is designed to run on an OCI Compute instance. It uses Instance
+Principal authentication for OCI access and protects public HTTP cost endpoints
+with an `X-API-Key` header.
 
-Copy `.env.example` to `.env` and set a long random `BILLING_API_KEY`.
+## Features
 
-```env
-BILLING_API_KEY=replace-with-a-long-random-secret
-OCI_AUTH=instance_principal
-CACHE_TTL_SECONDS=1800
-PORT=8000
-LOG_LEVEL=INFO
-```
+- Current-month total cost.
+- Current-month cost grouped by OCI service.
+- Current-month cost grouped by OCI resource.
+- Current-month daily cost trend.
+- In-memory TTL cache for Usage API responses.
+- Docker deployment with configurable public port.
+- No OCI user API key or private key file required in production.
 
-## OCI IAM
+## API
 
-Deploy this service on an OCI Compute instance and use Instance Principal
-authentication. Create a Dynamic Group that matches the instance, then grant the
-group permission to read tenancy cost and usage data required by OCI Usage API.
-
-Verify the exact policy statement in the target tenancy's Billing and Cost
-Management IAM documentation before production use.
-
-## Run
-
-```bash
-docker compose up -d --build
-```
-
-## Check
+Health check does not require authentication:
 
 ```bash
 curl http://SERVER_IP:8000/health
+```
+
+Cost endpoints require `X-API-Key`:
+
+```bash
 curl -H "X-API-Key: $BILLING_API_KEY" http://SERVER_IP:8000/cost/month
 curl -H "X-API-Key: $BILLING_API_KEY" http://SERVER_IP:8000/cost/month/by-service
 curl -H "X-API-Key: $BILLING_API_KEY" http://SERVER_IP:8000/cost/month/by-resource
 curl -H "X-API-Key: $BILLING_API_KEY" http://SERVER_IP:8000/cost/month/daily
 ```
 
-## Security
+Example response:
 
-The initial deployment exposes port 8000 directly and uses `X-API-Key` for
-application authentication. For public production use, put the service behind
-HTTPS termination with Caddy, Nginx, an OCI Load Balancer, or another TLS proxy.
+```json
+{
+  "month": "2026-07",
+  "currency": "SGD",
+  "timeUsageStarted": "2026-07-01T00:00:00Z",
+  "timeUsageEnded": "2026-07-08T00:00:00Z",
+  "cached": false,
+  "lastFetchedAt": "2026-07-08T02:53:03Z",
+  "total": 0.0
+}
+```
+
+## OCI IAM
+
+Create a Dynamic Group for the Compute instance that runs this service. For a
+single instance, use an instance OCID matching rule:
+
+```text
+instance.id = '<instance_ocid>'
+```
+
+Create a policy at the tenancy/root compartment:
+
+```text
+Allow dynamic-group <dynamic_group_name> to read usage-report in tenancy
+```
+
+IAM changes can take a few minutes to propagate.
+
+## Configuration
+
+Copy the example environment file:
+
+```bash
+cp .env.example .env
+```
+
+Edit `.env`:
+
+```env
+BILLING_API_KEY=replace-with-a-long-random-secret
+OCI_AUTH=instance_principal
+CACHE_TTL_SECONDS=1800
+HOST_PORT=8000
+PORT=8000
+LOG_LEVEL=INFO
+```
+
+Generate a random API key:
+
+```bash
+openssl rand -hex 32
+```
+
+`HOST_PORT` is the public host port. `PORT` is the internal Uvicorn port inside
+the container and should normally remain `8000`.
+
+## Docker
+
+Build and start:
+
+```bash
+docker compose up -d --build
+```
+
+Check status:
+
+```bash
+docker ps --filter name=oci-cost-service
+docker logs oci-cost-service
+```
+
+Stop:
+
+```bash
+docker compose down
+```
+
+## Direct Docker Run
+
+```bash
+API_KEY="$(openssl rand -hex 32)"
+
+docker build -t oci-cost-service:latest .
+docker run -d \
+  --name oci-cost-service \
+  --restart unless-stopped \
+  -e BILLING_API_KEY="$API_KEY" \
+  -e OCI_AUTH=instance_principal \
+  -e CACHE_TTL_SECONDS=1800 \
+  -e PORT=8000 \
+  -p 20000:8000 \
+  oci-cost-service:latest
+```
+
+Then call:
+
+```bash
+curl -H "X-API-Key: $API_KEY" http://SERVER_IP:20000/cost/month
+```
+
+## Development
+
+```bash
+python3 -m venv .venv
+.venv/bin/pip install -e '.[test]'
+.venv/bin/python -m pytest -v
+```
+
+## Security Notes
+
+- Do not commit `.env`.
+- Do not expose the service without `X-API-Key`.
+- Use HTTPS termination, such as Caddy, Nginx, or an OCI Load Balancer, for
+  public production access.
+- Rotate `BILLING_API_KEY` if it is ever shared accidentally.
