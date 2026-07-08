@@ -8,8 +8,9 @@ Granularity = Literal["DAILY", "MONTHLY"]
 
 
 class UsageGateway:
-    def __init__(self, client: Any) -> None:
+    def __init__(self, client: Any, tenant_id: str) -> None:
         self._client = client
+        self._tenant_id = tenant_id
 
     def request_costs(
         self,
@@ -20,6 +21,7 @@ class UsageGateway:
         group_by: list[str] | None = None,
     ) -> list[Any]:
         details = RequestSummarizedUsagesDetails(
+            tenant_id=self._tenant_id,
             time_usage_started=started,
             time_usage_ended=ended,
             granularity=granularity,
@@ -33,4 +35,4 @@ class UsageGateway:
 def build_instance_principal_gateway() -> UsageGateway:
     signer = oci.auth.signers.InstancePrincipalsSecurityTokenSigner()
     client = oci.usage_api.UsageapiClient(config={}, signer=signer)
-    return UsageGateway(client)
+    return UsageGateway(client, tenant_id=signer.tenancy_id)

@@ -15,7 +15,7 @@ class FakeUsageClient:
 
 def test_usage_gateway_builds_cost_request() -> None:
     fake_client = FakeUsageClient()
-    gateway = UsageGateway(fake_client)
+    gateway = UsageGateway(fake_client, tenant_id="ocid1.tenancy.example")
     started = datetime(2026, 7, 1, tzinfo=UTC)
     ended = datetime(2026, 7, 8, 12, tzinfo=UTC)
 
@@ -29,6 +29,7 @@ def test_usage_gateway_builds_cost_request() -> None:
     assert items == []
     assert fake_client.request.time_usage_started == started
     assert fake_client.request.time_usage_ended == ended
+    assert fake_client.request.tenant_id == "ocid1.tenancy.example"
     assert fake_client.request.granularity == "DAILY"
     assert fake_client.request.query_type == "COST"
     assert fake_client.request.group_by == ["service"]
