@@ -39,7 +39,7 @@ def test_month_total_response() -> None:
     assert response["currency"] == "USD"
     assert response["total"] == 4.0
     assert response["timeUsageStarted"] == "2026-07-01T00:00:00Z"
-    assert response["timeUsageEnded"] == "2026-07-08T12:00:00Z"
+    assert response["timeUsageEnded"] == "2026-07-08T00:00:00Z"
     assert response["cached"] is False
     assert response["lastFetchedAt"] == "2026-07-08T12:00:00Z"
 

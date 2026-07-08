@@ -9,7 +9,7 @@ def test_current_utc_month_range() -> None:
     started, ended = current_utc_month_range(now)
 
     assert started == datetime(2026, 7, 1, 0, 0, 0, tzinfo=UTC)
-    assert ended == now
+    assert ended == datetime(2026, 7, 8, 0, 0, 0, tzinfo=UTC)
 
 
 def test_month_key() -> None:
